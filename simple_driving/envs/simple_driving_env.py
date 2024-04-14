@@ -84,6 +84,7 @@ class SimpleDrivingEnv(gym.Env):
             #print("reached goal")
             self.done = True
             self.reached_goal = True
+            reward += 50 #bonus reward if the goal is reached
 
         ob = car_ob
         return ob, reward, self.done, dict()
@@ -188,6 +189,6 @@ class SimpleDrivingEnv(gym.Env):
 
     def _termination(self):
         return self._envStepCounter > 2000
-
+    
     def close(self):
         self._p.disconnect()
