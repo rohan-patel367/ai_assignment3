@@ -22,9 +22,9 @@ class SimpleDrivingEnv(gym.Env):
             self.action_space = gym.spaces.box.Box(
                 low=np.array([-1, -.6], dtype=np.float32),
                 high=np.array([1, .6], dtype=np.float32))
-        self.observation_space = gym.spaces.box.Box(
-            low=np.array([-40, -40], dtype=np.float32),
-            high=np.array([40, 40], dtype=np.float32))
+        self.observation_space = gym.spaces.Box(
+            low=np.array([-40, -40, -40, -40], dtype=np.float32),
+            high=np.array([40, 40, 40, 40], dtype=np.float32))
         self.np_random, _ = gym.utils.seeding.np_random()
 
         if renders:
@@ -57,34 +57,39 @@ class SimpleDrivingEnv(gym.Env):
             action = [throttle, steering_angle]
         self.car.apply_action(action)
         for i in range(self._actionRepeat):
-          self._p.stepSimulation()
-          if self._renders:
-            time.sleep(self._timeStep)
+            self._p.stepSimulation()
+            if self._renders:
+                time.sleep(self._timeStep)
 
-          carpos, carorn = self._p.getBasePositionAndOrientation(self.car.car)
-          goalpos, goalorn = self._p.getBasePositionAndOrientation(self.goal_object.goal)
-          car_ob = self.getExtendedObservation()
+            carpos, carorn = self._p.getBasePositionAndOrientation(self.car.car)
+            goalpos, goalorn = self._p.getBasePositionAndOrientation(self.goal_object.goal)
+            obstaclepos, obstacleorn = self._p.getBasePositionAndOrientation(self.obstacle)
+            car_ob = self.getExtendedObservation()
 
-          if self._termination():
-            self.done = True
-            break
-          self._envStepCounter += 1
+            # Check if the car has hit the obstacle
+            dist_to_obstacle = math.sqrt(((carpos[0] - obstaclepos[0]) ** 2 +
+                                          (carpos[1] - obstaclepos[1]) ** 2))
+            if dist_to_obstacle < 1.5:  
+                reward = -50  # give a large negative reward for hitting the obstacle
+                self.done = True  # end the episode
+                return car_ob, reward, self.done, dict()
+
+            if self._termination():
+                self.done = True
+                break
+            self._envStepCounter += 1
 
         # Compute reward as L2 change in distance to goal
-        # dist_to_goal = math.sqrt(((car_ob[0] - self.goal[0]) ** 2 +
-                                  # (car_ob[1] - self.goal[1]) ** 2))
         dist_to_goal = math.sqrt(((carpos[0] - goalpos[0]) ** 2 +
                                   (carpos[1] - goalpos[1]) ** 2))
-        # reward = max(self.prev_dist_to_goal - dist_to_goal, 0)
         reward = -dist_to_goal
         self.prev_dist_to_goal = dist_to_goal
 
         # Done by reaching goal
         if dist_to_goal < 1.5 and not self.reached_goal:
-            #print("reached goal")
             self.done = True
             self.reached_goal = True
-            reward += 50 #bonus reward if the goal is reached
+            reward += 50  # bonus reward if the goal is reached
 
         ob = car_ob
         return ob, reward, self.done, dict()
@@ -104,24 +109,30 @@ class SimpleDrivingEnv(gym.Env):
 
         # Set the goal to a random target
         x = (self.np_random.uniform(5, 9) if self.np_random.integers(2) else
-             self.np_random.uniform(-9, -5))
+            self.np_random.uniform(-9, -5))
         y = (self.np_random.uniform(5, 9) if self.np_random.integers(2) else
-             self.np_random.uniform(-9, -5))
+            self.np_random.uniform(-9, -5))
         self.goal = (x, y)
         self.done = False
         self.reached_goal = False
 
+        # Set the obstacle to a random location
+        obs_x = (self.np_random.uniform(5, 9) if self.np_random.integers(2) else
+               self.np_random.uniform(-9, -5))
+        obs_y = (self.np_random.uniform(5, 9) if self.np_random.integers(2) else
+               self.np_random.uniform(-9, -5))
+        self.obstacle_pos = (obs_x, obs_y)
+
         # Visual element of the goal
         self.goal_object = Goal(self._p, self.goal)
-
+        self.obstacle = self._p.loadURDF("C:/Users/rohan/Documents/PlatformIO/Projects/ai_assignment3/simple_driving/resources/simplegoal.urdf", basePosition=[*self.obstacle_pos, 0])
+        
         # Get observation to return
         carpos = self.car.get_observation()
 
         self.prev_dist_to_goal = math.sqrt(((carpos[0] - self.goal[0]) ** 2 +
-                                           (carpos[1] - self.goal[1]) ** 2))
+                                    (carpos[1] - self.goal[1]) ** 2))
         car_ob = self.getExtendedObservation()
-        
-        self.obstacle = self._p.loadURDF("simple_driving\resources\simplegoal.urdf", basePosition=[2, 2, 0])
 
         return np.array(car_ob, dtype=np.float32)
 
