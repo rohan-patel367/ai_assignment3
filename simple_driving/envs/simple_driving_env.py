@@ -120,6 +120,9 @@ class SimpleDrivingEnv(gym.Env):
         self.prev_dist_to_goal = math.sqrt(((carpos[0] - self.goal[0]) ** 2 +
                                            (carpos[1] - self.goal[1]) ** 2))
         car_ob = self.getExtendedObservation()
+        
+        self.obstacle = self._p.loadURDF("simple_driving\resources\simplegoal.urdf", basePosition=[2, 2, 0])
+
         return np.array(car_ob, dtype=np.float32)
 
     def render(self, mode='human'):
@@ -178,13 +181,15 @@ class SimpleDrivingEnv(gym.Env):
             return np.array([])
 
     def getExtendedObservation(self):
-        # self._observation = []  #self._racecar.getObservation()
         carpos, carorn = self._p.getBasePositionAndOrientation(self.car.car)
         goalpos, goalorn = self._p.getBasePositionAndOrientation(self.goal_object.goal)
+        obstaclepos, obstacleorn = self._p.getBasePositionAndOrientation(self.obstacle)
+
         invCarPos, invCarOrn = self._p.invertTransform(carpos, carorn)
         goalPosInCar, goalOrnInCar = self._p.multiplyTransforms(invCarPos, invCarOrn, goalpos, goalorn)
+        obstaclePosInCar, obstacleOrnInCar = self._p.multiplyTransforms(invCarPos, invCarOrn, obstaclepos, obstacleorn)
 
-        observation = [goalPosInCar[0], goalPosInCar[1]]
+        observation = [goalPosInCar[0], goalPosInCar[1], obstaclePosInCar[0], obstaclePosInCar[1]]
         return observation
 
     def _termination(self):
