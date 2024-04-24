@@ -66,14 +66,6 @@ class SimpleDrivingEnv(gym.Env):
             obstaclepos, obstacleorn = self._p.getBasePositionAndOrientation(self.obstacle)
             car_ob = self.getExtendedObservation()
 
-            # Check if the car has hit the obstacle
-            dist_to_obstacle = math.sqrt(((carpos[0] - obstaclepos[0]) ** 2 +
-                                          (carpos[1] - obstaclepos[1]) ** 2))
-            if dist_to_obstacle < 1.5:  
-                reward = -50  # give a large negative reward for hitting the obstacle
-                self.done = True  # end the episode
-                return car_ob, reward, self.done, dict()
-
             if self._termination():
                 self.done = True
                 break
@@ -82,14 +74,27 @@ class SimpleDrivingEnv(gym.Env):
         # Compute reward as L2 change in distance to goal
         dist_to_goal = math.sqrt(((carpos[0] - goalpos[0]) ** 2 +
                                   (carpos[1] - goalpos[1]) ** 2))
-        reward = -dist_to_goal
+        
+        dist_to_obstacle = math.sqrt(((carpos[0] - obstaclepos[0]) ** 2 +
+                                          (carpos[1] - obstaclepos[1]) ** 2))
+        reward = -0.7 * (dist_to_goal ** 2) + 0.3 * (1 / (dist_to_obstacle + 0.01))
         self.prev_dist_to_goal = dist_to_goal
 
         # Done by reaching goal
         if dist_to_goal < 1.5 and not self.reached_goal:
             self.done = True
             self.reached_goal = True
-            reward += 50  # bonus reward if the goal is reached
+            step_bonus = 2000 / self._envStepCounter # bonus for reaching goal faster
+            reward += 50 + step_bonus # bonus reward if the goal is reached
+            print("REACHED GOAL")
+
+         # Check if the car has hit the obstacle
+            
+        elif dist_to_obstacle < 1.5:  
+            reward += -50  # give a large negative reward for hitting the obstacle
+            self.done = True  # end the episode
+            print("HIT OBSTACLE")
+
 
         ob = car_ob
         return ob, reward, self.done, dict()
@@ -125,7 +130,7 @@ class SimpleDrivingEnv(gym.Env):
 
         # Visual element of the goal
         self.goal_object = Goal(self._p, self.goal)
-        self.obstacle = self._p.loadURDF("C:/Users/rohan/Documents/PlatformIO/Projects/ai_assignment3/simple_driving/resources/simplegoal.urdf", basePosition=[*self.obstacle_pos, 0])
+        self.obstacle = self._p.loadURDF("C:/Users/RohanPatel/Documents/Git/ai_assignment3/simple_driving/resources/simplegoal.urdf", basePosition=[*self.obstacle_pos, 0])
         
         # Get observation to return
         carpos = self.car.get_observation()
